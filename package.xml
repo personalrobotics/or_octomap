@@ -1,0 +1,34 @@
+
+<package>
+  <name>or_octomap</name>
+  <version>0.0.0</version>
+  <description>
+    OpenRAVE collision checker plugin which uses octomap.
+  </description>
+  <author>Matt Klingensmith</author>
+  <maintainer email="mklingen@andrew.cmu.edu">Matt Klingensmith</maintainer>
+  <license>unreleased</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>openrave</build_depend>
+  <build_depend>openrave_catkin</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>octomap_ros</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>pcl_ros</build_depend>
+  <build_depend>octomap_server</build_depend>
+
+  <run_depend>openrave</run_depend>
+  <run_depend>openrave_catkin</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>octomap_ros</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>pcl_ros</run_depend>
+  <run_depend>octomap_server</run_depend>
+  <export>
+    <openrave plugins="${prefix}/lib"/>
+  </export>
+</package>
+
+
+
+
