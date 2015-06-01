@@ -21,6 +21,10 @@ include_directories(
   ${OCTOMAP_INCLUDE_DIRS}
 )
 
+link_directories(
+    ${OpenRAVE_LIBRARY_DIRS}
+)
+
 set(SOURCES
  	src/OctomapInterface.cpp
  	src/OctomapInterface.h
