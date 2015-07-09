@@ -21,7 +21,7 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
     {
         if (!ros::isInitialized())
         {
-            ros::init(argc, argv, "or_octomap");
+            ros::init(argc, argv, "or_octomap",  ros::init_options::AnonymousName);
         }
         else
         {
