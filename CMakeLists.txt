@@ -28,19 +28,13 @@ link_directories(
 set(SOURCES
  	src/OctomapInterface.cpp
  	src/OctomapInterface.h
- 	src/OctomapCollisionChecker.cpp
- 	src/OctomapCollisionChecker.h
- 	src/FastAABBTriangleTest.h
-    src/Plugin.cpp
-    src/Plugin.h)
-
-set(CLIENT_SOURCES
  	src/OctomapClientInterface.cpp
  	src/OctomapClientInterface.h
  	src/OctomapCollisionChecker.cpp
  	src/OctomapCollisionChecker.h
  	src/FastAABBTriangleTest.h
-    src/ClientPlugin.cpp)
+    src/Plugin.cpp
+    src/Plugin.h)
 
 set(COLLISION_SOURCES
  	src/OctomapInterface.cpp
@@ -54,21 +48,11 @@ openrave_plugin(${PROJECT_NAME}
     ${SOURCES}
 )
 
-openrave_plugin("${PROJECT_NAME}_client"
-    ${CLIENT_SOURCES}
-)
-
 openrave_plugin("${PROJECT_NAME}_checker"
     ${COLLISION_SOURCES}
 )
 
 target_link_libraries(${PROJECT_NAME}
-    ${catkin_LIBRARIES}
-    ${OPENRAVE_LIBRARIES}
-    ${OCTOMAP_LIBRARIES}
-)
-
-target_link_libraries("${PROJECT_NAME}_client"
     ${catkin_LIBRARIES}
     ${OPENRAVE_LIBRARIES}
     ${OCTOMAP_LIBRARIES}

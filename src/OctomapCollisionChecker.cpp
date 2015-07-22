@@ -520,6 +520,12 @@ namespace or_octomap
             ROS_INFO("Masking...\n");
         }
 
+        if (GetTreeClone()->size() == 0)
+        {
+            ROS_INFO("Empty tree...\n");
+            return;
+        }
+
         OpenRAVE::AABB aabb = pbody->ComputeAABB();
         float halfResolution = GetTreeClone()->getResolution() * 1.5f;
 

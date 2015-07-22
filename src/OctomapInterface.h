@@ -27,6 +27,8 @@ namespace or_octomap
             virtual bool SendCommand(std::ostream &os, std::istream &is);
             virtual void Reset();
 
+            virtual void insertScan(const tf::Point& sensorOrigin, const PCLPointCloud& ground, const PCLPointCloud& nonground);
+
             void SetEnabled(bool enabled);
             inline bool IsEnabled() { return m_isEnabled; }
 
@@ -65,7 +67,9 @@ namespace or_octomap
             boost::mutex m_cloudQueueMutex;
             std::vector<sensor_msgs::PointCloud2ConstPtr> m_cloudQueue;
             bool m_isPaused;
-
+            boost::mutex m_maskedObjectsMutex;
+            std::vector<std::string> m_maskedObjects;
+            OpenRAVE::KinBodyPtr m_sphere;
     };
 
 }

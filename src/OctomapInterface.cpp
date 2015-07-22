@@ -50,6 +50,12 @@ namespace or_octomap
         m_collisionChecker = NULL;
         boost::thread spinThread = boost::thread(boost::bind(&OctomapInterface::Spin, this));
         //boost::thread(boost::bind(&OctomapInterface::TestCollision, this));
+
+        m_sphere = OpenRAVE::RaveCreateKinBody(env);
+        std::vector< OpenRAVE::Vector > spheres;
+        spheres.push_back( OpenRAVE::Vector(0,0,0,0.04) );
+        m_sphere->InitFromSpheres(spheres, true);
+        m_sphere->SetName("octomap_server_probe_sphere");
     }
     
     void OctomapInterface::InsertCloudWrapper(const sensor_msgs::PointCloud2::ConstPtr& cloud)
@@ -74,6 +80,159 @@ namespace or_octomap
         }
     }
 
+    void OctomapInterface::insertScan(const tf::Point& sensorOriginTf, const PCLPointCloud& ground, const PCLPointCloud& nonground){
+        octomap::point3d sensorOrigin = octomap::pointTfToOctomap(sensorOriginTf);
+
+        if (!m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMin)
+            || !m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMax))
+        {
+            ROS_ERROR_STREAM("Could not generate Key for origin "<<sensorOrigin);
+        }
+
+        //
+        // add mask information to the point cloud
+        //
+        OpenRAVE::EnvironmentBasePtr  penv = GetEnv();
+        // create a vector of masked bodies
+        std::vector<OpenRAVE::KinBodyPtr > maskedBodies;
+        {
+            boost::mutex::scoped_lock(m_maskedObjectsMutex);
+            for (std::vector<std::string >::const_iterator o_it = m_maskedObjects.begin(); o_it != m_maskedObjects.end(); o_it++)
+            {
+                maskedBodies.push_back( penv->GetKinBody(*o_it) );
+            }
+        }
+
+        int numBodies = maskedBodies.size();
+
+        // compute AABB for each body
+//        std::vector<OpenRAVE::AABB > aabb;
+//        for (std::vector<OpenRAVE::KinBodyPtr >::const_iterator o_it = maskedBodies.begin(); o_it != maskedBodies.end(); o_it++)
+//        {
+//            aabb.push_back( (*o_it)->ComputeAABB() );
+//        }
+
+        // instead of direct scan insertion, compute update to filter ground:
+        octomap::KeySet free_cells, occupied_cells;
+        // insert ground points only as free:
+        for (PCLPointCloud::const_iterator it = ground.begin(); it != ground.end(); ++it){
+            octomap::point3d point(it->x, it->y, it->z);
+            // maxrange check
+            if ((m_maxRange > 0.0) && ((point - sensorOrigin).norm() > m_maxRange) ) {
+                point = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
+            }
+
+            // only clear space (ground points)
+            if (m_octree->computeRayKeys(sensorOrigin, point, m_keyRay)){
+                free_cells.insert(m_keyRay.begin(), m_keyRay.end());
+            }
+
+            octomap::OcTreeKey endKey;
+            if (m_octree->coordToKeyChecked(point, endKey)){
+                updateMinKey(endKey, m_updateBBXMin);
+                updateMaxKey(endKey, m_updateBBXMax);
+            } else{
+                ROS_ERROR_STREAM("Could not generate Key for endpoint "<<point);
+            }
+        }
+
+        penv->Add(m_sphere, true);
+        OpenRAVE::Transform tr;
+
+        // all other points: free on ray, occupied on endpoint:
+        for (PCLPointCloud::const_iterator it = nonground.begin(); it != nonground.end(); ++it){
+            octomap::point3d point(it->x, it->y, it->z);
+            tr.trans.x = it->x;
+            tr.trans.y = it->y;
+            tr.trans.z = it->z;
+            m_sphere->SetTransform(tr);
+            bool maskedHit = false;
+            for (int b_idx = 0; b_idx < numBodies; b_idx++)
+            {
+                if (penv->CheckCollision(maskedBodies[b_idx], m_sphere))
+                {
+                    maskedHit = true;
+                    break;
+                }
+            }
+
+            if (maskedHit)
+            {
+                // free cells
+                if (m_octree->computeRayKeys(sensorOrigin, point, m_keyRay)){
+                    free_cells.insert(m_keyRay.begin(), m_keyRay.end());
+                }
+            }
+            else if ((m_maxRange < 0.0) || ((point - sensorOrigin).norm() <= m_maxRange) ) { // maxrange check
+
+                // free cells
+                if (m_octree->computeRayKeys(sensorOrigin, point, m_keyRay)){
+                    free_cells.insert(m_keyRay.begin(), m_keyRay.end());
+                }
+                // occupied endpoint
+                octomap::OcTreeKey key;
+                if (m_octree->coordToKeyChecked(point, key)){
+                    occupied_cells.insert(key);
+
+                    updateMinKey(key, m_updateBBXMin);
+                    updateMaxKey(key, m_updateBBXMax);
+                }
+            } else {// ray longer than maxrange:;
+                octomap::point3d new_end = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
+                if (m_octree->computeRayKeys(sensorOrigin, new_end, m_keyRay)){
+                    free_cells.insert(m_keyRay.begin(), m_keyRay.end());
+
+                    octomap::OcTreeKey endKey;
+                    if (m_octree->coordToKeyChecked(new_end, endKey)){
+                        updateMinKey(endKey, m_updateBBXMin);
+                        updateMaxKey(endKey, m_updateBBXMax);
+                    } else{
+                        ROS_ERROR_STREAM("Could not generate Key for endpoint "<<new_end);
+                    }
+                }
+            }
+        }
+        penv->Remove(m_sphere);
+
+        // mark free cells only if not seen occupied in this cloud
+        for(octomap::KeySet::iterator it = free_cells.begin(), end=free_cells.end(); it!= end; ++it){
+            if (occupied_cells.find(*it) == occupied_cells.end()){
+                m_octree->updateNode(*it, false);
+            }
+        }
+
+        // now mark all occupied cells:
+        for (octomap::KeySet::iterator it = occupied_cells.begin(), end=free_cells.end(); it!= end; it++) {
+            m_octree->updateNode(*it, true);
+        }
+
+        // TODO: eval lazy+updateInner vs. proper insertion
+        // non-lazy by default (updateInnerOccupancy() too slow for large maps)
+        //m_octree->updateInnerOccupancy();
+        octomap::point3d minPt, maxPt;
+        ROS_DEBUG_STREAM("Bounding box keys (before): " << m_updateBBXMin[0] << " " <<m_updateBBXMin[1] << " " << m_updateBBXMin[2] << " / " <<m_updateBBXMax[0] << " "<<m_updateBBXMax[1] << " "<< m_updateBBXMax[2]);
+
+        // TODO: snap max / min keys to larger voxels by m_maxTreeDepth
+      //   if (m_maxTreeDepth < 16)
+      //   {
+      //      OcTreeKey tmpMin = getIndexKey(m_updateBBXMin, m_maxTreeDepth); // this should give us the first key at depth m_maxTreeDepth that is smaller or equal to m_updateBBXMin (i.e. lower left in 2D grid coordinates)
+      //      OcTreeKey tmpMax = getIndexKey(m_updateBBXMax, m_maxTreeDepth); // see above, now add something to find upper right
+      //      tmpMax[0]+= m_octree->getNodeSize( m_maxTreeDepth ) - 1;
+      //      tmpMax[1]+= m_octree->getNodeSize( m_maxTreeDepth ) - 1;
+      //      tmpMax[2]+= m_octree->getNodeSize( m_maxTreeDepth ) - 1;
+      //      m_updateBBXMin = tmpMin;
+      //      m_updateBBXMax = tmpMax;
+      //   }
+
+        // TODO: we could also limit the bbx to be within the map bounds here (see publishing check)
+        minPt = m_octree->keyToCoord(m_updateBBXMin);
+        maxPt = m_octree->keyToCoord(m_updateBBXMax);
+        ROS_DEBUG_STREAM("Updated area bounding box: "<< minPt << " - "<<maxPt);
+        ROS_DEBUG_STREAM("Bounding box keys (after): " << m_updateBBXMin[0] << " " <<m_updateBBXMin[1] << " " << m_updateBBXMin[2] << " / " <<m_updateBBXMax[0] << " "<<m_updateBBXMax[1] << " "<< m_updateBBXMax[2]);
+
+        if (m_compressMap)
+            m_octree->prune();
+    }
 
 
     void OctomapInterface::TestCollision()
@@ -204,6 +363,7 @@ namespace or_octomap
             return false;
         }
 
+        m_maskedObjects.push_back(objectName);
 
         bool toReturn = m_collisionChecker->MaskObject(objectName);
         publishAll();
