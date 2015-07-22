@@ -42,6 +42,8 @@ namespace or_octomap
                         "Stop collision testing octomap.");
         RegisterCommand("Mask", boost::bind(&OctomapInterface::MaskObject, this, _1, _2),
                         "Mask an object out of the octomap");
+        RegisterCommand("Unmask", boost::bind(&OctomapInterface::UnmaskObject, this, _1, _2),
+                        "Remove the mask for object");
         RegisterCommand("TogglePause", boost::bind(&OctomapInterface::TogglePause, this, _1, _2),
                         "Toggles the octomap to being paused/unpaused for collecting data");
 
@@ -93,13 +95,18 @@ namespace or_octomap
         // add mask information to the point cloud
         //
         OpenRAVE::EnvironmentBasePtr  penv = GetEnv();
+
         // create a vector of masked bodies
         std::vector<OpenRAVE::KinBodyPtr > maskedBodies;
         {
             boost::mutex::scoped_lock(m_maskedObjectsMutex);
             for (std::vector<std::string >::const_iterator o_it = m_maskedObjects.begin(); o_it != m_maskedObjects.end(); o_it++)
             {
-                maskedBodies.push_back( penv->GetKinBody(*o_it) );
+                KinBodyPtr pbody = penv->GetKinBody(*o_it);
+                if (pbody.get() != NULL)
+                {
+                    maskedBodies.push_back( pbody );
+                }
             }
         }
 
@@ -363,7 +370,10 @@ namespace or_octomap
             return false;
         }
 
-        m_maskedObjects.push_back(objectName);
+        {
+            boost::mutex::scoped_lock(m_maskedObjectsMutex);
+            m_maskedObjects.push_back(objectName);
+        }
 
         bool toReturn = m_collisionChecker->MaskObject(objectName);
         publishAll();
@@ -371,6 +381,33 @@ namespace or_octomap
         return toReturn;
     }
 
+    bool OctomapInterface::UnmaskObject(std::ostream &os, std::istream &i)
+    {
+
+        std::string objectName;
+        i >> objectName;
+
+        ROS_INFO("Unmasking object %s\n", objectName.c_str());
+
+        if(objectName == "" || !IsEnabled())
+        {
+            return false;
+        }
+
+        {
+            boost::mutex::scoped_lock(m_maskedObjectsMutex);
+            for (std::vector<std::string >::iterator o_it = m_maskedObjects.begin(); o_it != m_maskedObjects.end(); o_it++)
+            {
+                if ( (*o_it) == objectName )
+                {
+                    m_maskedObjects.erase(o_it);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
 
 
