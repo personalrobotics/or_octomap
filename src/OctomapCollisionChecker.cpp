@@ -3,6 +3,8 @@
 //
 //  Created on: Jan 24, 2014
 //      Author: mklingen
+//  Modified on: Jul 23, 2015
+//      Author: dseredyn
 ////
 
 #include "OctomapInterface.h"

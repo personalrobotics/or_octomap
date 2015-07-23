@@ -40,12 +40,10 @@ namespace or_octomap
 
             bool Enable(std::ostream &os, std::istream &i) { SetEnabled(true); return true;}
             bool Disable(std::ostream &os, std::istream &i) { SetEnabled(false); return true; }
-            bool MaskObject(std::ostream &os, std::istream &i);
             bool Update(std::ostream &os, std::istream &i);
 
+            void Spin();
             bool UpdateOctomap();
-
-            void TestCollision();
 
         protected:
             void CreateFakeBody();

@@ -18,9 +18,11 @@ using namespace octomap_server;
 
 namespace or_octomap
 {
-    
     OctomapClientInterface::OctomapClientInterface(ros::NodeHandle& nodeHandle, OpenRAVE::EnvironmentBasePtr env) :
-        SensorSystemBase(env), m_shouldExit(false), m_octomapClient(nodeHandle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")), m_octree(NULL)
+        SensorSystemBase(env),
+        m_shouldExit(false),
+        m_octomapClient(nodeHandle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")),
+        m_octree(NULL)
     {
         RegisterCommand("Update", boost::bind(&OctomapClientInterface::Update, this, _1, _2),
                         "Update the octomap");
@@ -29,50 +31,23 @@ namespace or_octomap
                         "Begin collision testing octomap");
         RegisterCommand("Disable", boost::bind(&OctomapClientInterface::Disable, this, _1, _2),
                         "Stop collision testing octomap.");
-        RegisterCommand("Mask", boost::bind(&OctomapClientInterface::MaskObject, this, _1, _2),
-                        "Mask an object out of the octomap");
 
         m_collisionChecker = NULL;
+        boost::thread spinThread = boost::thread(boost::bind(&OctomapClientInterface::Spin, this));
     }
-    
-    void OctomapClientInterface::TestCollision()
+
+    void OctomapClientInterface::Spin()
     {
-        float timey = 0.0f;
-        bool lastCollisionState = false;
+        ros::Rate r(10);
         while(!m_shouldExit)
         {
-            timey += 0.01f;
-            OpenRAVE::CollisionReportPtr report(new OpenRAVE::CollisionReport());
-            OpenRAVE::KinBodyConstPtr fakeBody = GetEnv()->GetKinBody("_OCTOMAP_MAP_");
-            OpenRAVE::KinBodyPtr fuze = GetEnv()->GetKinBody("fuze_bottle");
-            if(fakeBody.get())
-            {
-                boost::mutex::scoped_lock(m_cloudQueueMutex);
-                bool collides = GetEnv()->CheckCollision(fakeBody, report);
-
-                ROS_INFO("Collides: %s", collides ? "true" : "false");
-
-                OpenRAVE::Transform t;
-                t.identity();
-
-                float r = 0.1 * cos(timey * 0.1f);
-                t.trans = OpenRAVE::Vector(r * sin(timey) + 0.5f, r * cos(timey), 0.0f);
-
-                if(fuze.get())
-                {
-                    fuze->SetTransform(t);
-                }
-
-                lastCollisionState = collides;
-            }
-
-            usleep(10000);
+            ros::spinOnce();
+            r.sleep();
         }
     }
-
+    
     OctomapClientInterface::~OctomapClientInterface()
     {
-        SetEnabled(false);
         m_shouldExit = true;
     }
 
@@ -92,7 +67,6 @@ namespace or_octomap
             OpenRAVE::CollisionCheckerBasePtr collisionCheckerBase = RaveCreateCollisionChecker(GetEnv(), "or_octomap_checker");
 
             m_collisionChecker = dynamic_cast<OctomapCollisionChecker*>(collisionCheckerBase.get());
-            UpdateOctomap();
             m_collisionChecker->SetTreeClone(m_octree);
             m_collisionChecker->SetWrappedChecker(GetEnv()->GetCollisionChecker());
             CreateFakeBody();
@@ -157,24 +131,4 @@ namespace or_octomap
     {
         return UpdateOctomap();
     }
-
-    bool OctomapClientInterface::MaskObject(std::ostream &os, std::istream &i)
-    {
-
-        std::string objectName;
-        i >> objectName;
-
-        ROS_INFO("Masking object %s\n", objectName.c_str());
-
-        if(objectName == "" || !IsEnabled())
-        {
-            return false;
-        }
-
-
-        bool toReturn = m_collisionChecker->MaskObject(objectName);
-
-        return toReturn;
-    }
-
 }

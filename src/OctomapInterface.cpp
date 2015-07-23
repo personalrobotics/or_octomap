@@ -3,6 +3,8 @@
 //
 //  Created on: Jan 24, 2014
 //      Author: mklingen
+//  Modified on: Jul 23, 2015
+//      Author: dseredyn
 ////
 
 #include "OctomapInterface.h"
@@ -20,18 +22,18 @@ namespace or_octomap
 {
     
     OctomapInterface::OctomapInterface(ros::NodeHandle& nodeHandle, OpenRAVE::EnvironmentBasePtr env) :
-        SensorSystemBase(env), OctomapServer(nodeHandle), m_shouldExit(false)
+        SensorSystemBase(env),
+        OctomapServer(nodeHandle),
+        m_shouldExit(false),
+        m_pointCloudTopic("cloud_in")
     {
 
         m_isPaused = false;
+
+        nodeHandle.param("point_cloud_topic", m_pointCloudTopic, m_pointCloudTopic);
+
         m_pointCloudSub->unsubscribe();
-
-        //delete m_pointCloudSub;
-        delete m_tfPointCloudSub;
-
-        m_pointCloudSub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh,  "/head_kinect/depth_registered/points", 1, ros::TransportHints(), &m_queue);
-        m_tfPointCloudSub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointCloudSub, m_tfListener, m_worldFrameId, 1, m_nh, ros::Duration(0.1));
-        m_tfPointCloudSub->registerCallback(boost::bind(&OctomapInterface::InsertCloudWrapper, this, _1));
+        m_pointCloudSub->subscribe(nodeHandle, m_pointCloudTopic, 5);
 
         ROS_INFO("Frame ID: %s", m_worldFrameId.c_str());
         ROS_INFO("Topic: %s", m_pointCloudSub->getTopic().c_str());
@@ -47,8 +49,6 @@ namespace or_octomap
         RegisterCommand("TogglePause", boost::bind(&OctomapInterface::TogglePause, this, _1, _2),
                         "Toggles the octomap to being paused/unpaused for collecting data");
 
-
-
         m_collisionChecker = NULL;
         boost::thread spinThread = boost::thread(boost::bind(&OctomapInterface::Spin, this));
         //boost::thread(boost::bind(&OctomapInterface::TestCollision, this));
@@ -59,29 +59,8 @@ namespace or_octomap
         m_sphere->InitFromSpheres(spheres, true);
         m_sphere->SetName("octomap_server_probe_sphere");
     }
-    
-    void OctomapInterface::InsertCloudWrapper(const sensor_msgs::PointCloud2::ConstPtr& cloud)
-    {
-        boost::mutex::scoped_lock(m_cloudQueueMutex);
 
-        if(!m_isPaused)
-        {
-            m_cloudQueue.push_back(cloud);
-        }
-    }
-
-    void OctomapInterface::InsertScans()
-    {
-        while(m_cloudQueue.size() > 0)
-        {
-            boost::mutex::scoped_lock(m_cloudQueueMutex);
-
-            insertCloudCallback(m_cloudQueue.front());
-            m_cloudQueue.erase(m_cloudQueue.begin());
-
-        }
-    }
-
+    // this method is copied from OctomapServer.cpp and modified
     void OctomapInterface::insertScan(const tf::Point& sensorOriginTf, const PCLPointCloud& ground, const PCLPointCloud& nonground){
         octomap::point3d sensorOrigin = octomap::pointTfToOctomap(sensorOriginTf);
 
@@ -111,13 +90,6 @@ namespace or_octomap
         }
 
         int numBodies = maskedBodies.size();
-
-        // compute AABB for each body
-//        std::vector<OpenRAVE::AABB > aabb;
-//        for (std::vector<OpenRAVE::KinBodyPtr >::const_iterator o_it = maskedBodies.begin(); o_it != maskedBodies.end(); o_it++)
-//        {
-//            aabb.push_back( (*o_it)->ComputeAABB() );
-//        }
 
         // instead of direct scan insertion, compute update to filter ground:
         octomap::KeySet free_cells, occupied_cells;
@@ -279,17 +251,16 @@ namespace or_octomap
 
     void OctomapInterface::Spin()
     {
-        ros::WallDuration timeout(0.1);
+        ros::Rate r(10);
         while(!m_shouldExit)
         {
-            m_queue.callOne(timeout);
-            InsertScans();
+            ros::spinOnce();
+            r.sleep();
         }
     }
 
     OctomapInterface::~OctomapInterface()
     {
-        SetEnabled(false);
         m_shouldExit = true;
     }
 
@@ -309,7 +280,6 @@ namespace or_octomap
             OpenRAVE::CollisionCheckerBasePtr collisionCheckerBase = RaveCreateCollisionChecker(GetEnv(), "or_octomap_checker");
 
             m_collisionChecker = dynamic_cast<OctomapCollisionChecker*>(collisionCheckerBase.get());
-            //new OctomapCollisionChecker(GetEnv(), GetEnv()->GetCollisionChecker(), this);
             m_collisionChecker->SetInterface(this);
             m_collisionChecker->SetWrappedChecker(GetEnv()->GetCollisionChecker());
             CreateFakeBody();

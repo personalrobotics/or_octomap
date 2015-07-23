@@ -3,6 +3,8 @@
 //
 //  Created on: Jan 27, 2014
 //      Author: mklingen
+//  Modified on: Jul 23, 2015
+//      Author: dseredyn
 ////
 #include "OctomapInterface.h"
 #include "OctomapClientInterface.h"
@@ -22,33 +24,15 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
     {
         if (!ros::isInitialized())
         {
-            ros::init(argc, argv, "or_octomap_server");
+            ros::init(argc, argv, "or_octomap_server", ros::init_options::NoSigintHandler);
+            RAVELOG_DEBUG("Creating ROS node '%s'\n", ros::this_node::getName().c_str());
         }
         else
         {
             RAVELOG_DEBUG("Using existing ROS node '%s'\n", ros::this_node::getName().c_str());
         }
 
-
-
-        std::map<std::string, std::string> remaps;
-        remaps["/cloud_in"] = "/head_kinect/depth_registered/points";
-        //fakeNode = new ros::NodeHandle("remap_node", remaps);
-
-        ros::NodeHandle nodeHandle("~", remaps);
-
-        // TODO: Figure out how to give user access to these parameters :(
-        double resolution = 0.025;
-        std::string frameID = "/map";
-        double maxRange = 5.0;
-        nodeHandle.param("resolution", resolution, resolution);
-        nodeHandle.param("frame_id", frameID, frameID);
-        nodeHandle.param("sensor_model/max_range", maxRange, maxRange);
-
-        nodeHandle.setParam("resolution", resolution);
-        nodeHandle.setParam("frame_id", frameID);
-        nodeHandle.setParam("sensor_model/max_range", maxRange);
-
+        ros::NodeHandle nodeHandle("~");
 
         return OpenRAVE::InterfaceBasePtr(new OctomapInterface(nodeHandle,  penv));
     }
@@ -56,7 +40,8 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
     {
         if (!ros::isInitialized())
         {
-            ros::init(argc, argv, "or_octomap_client",  ros::init_options::AnonymousName);
+            ros::init(argc, argv, "or_octomap_client", ros::init_options::NoSigintHandler | ros::init_options::AnonymousName);
+            RAVELOG_DEBUG("Creating ROS node '%s'\n", ros::this_node::getName().c_str());
         }
         else
         {
