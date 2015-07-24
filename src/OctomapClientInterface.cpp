@@ -18,11 +18,11 @@ using namespace octomap_server;
 
 namespace or_octomap
 {
-    OctomapClientInterface::OctomapClientInterface(ros::NodeHandle& nodeHandle, OpenRAVE::EnvironmentBasePtr env) :
+    OctomapClientInterface::OctomapClientInterface(OpenRAVE::EnvironmentBasePtr env, bool ros) :
         SensorSystemBase(env),
         m_shouldExit(false),
-        m_octomapClient(nodeHandle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")),
-        m_octree(NULL)
+        m_octree(NULL),
+        m_ros(ros)
     {
         RegisterCommand("Update", boost::bind(&OctomapClientInterface::Update, this, _1, _2),
                         "Update the octomap");
@@ -32,8 +32,17 @@ namespace or_octomap
         RegisterCommand("Disable", boost::bind(&OctomapClientInterface::Disable, this, _1, _2),
                         "Stop collision testing octomap.");
 
+        RegisterCommand("SetOcTree", boost::bind(&OctomapClientInterface::SetOcTree, this, _1, _2),
+                        "Set the serialized OcTree message");
+
+        RegisterCommand("GetOcTree", boost::bind(&OctomapClientInterface::GetOcTree, this, _1, _2),
+                        "Get the serialized OcTree message");
+
         m_collisionChecker = NULL;
-        boost::thread spinThread = boost::thread(boost::bind(&OctomapClientInterface::Spin, this));
+        if (ros)
+        {
+            boost::thread spinThread = boost::thread(boost::bind(&OctomapClientInterface::Spin, this));
+        }
     }
 
     void OctomapClientInterface::Spin()
@@ -112,23 +121,43 @@ namespace or_octomap
 
     bool OctomapClientInterface::UpdateOctomap()
     {
-        if (ros::service::call("/octomap_binary", m_octomapMsg))
+        if (m_ros)
         {
-            SAFE_DELETE(m_octree);
-            m_octree = octomap_msgs::binaryMsgToMap(m_octomapMsg.response.map);
-            m_collisionChecker->SetTreeClone(m_octree);
+            if (ros::service::call("/octomap_binary", m_octomapMsg))
+            {
+                SAFE_DELETE(m_octree);
+                m_octree = octomap_msgs::binaryMsgToMap(m_octomapMsg.response.map);
+                m_collisionChecker->SetTreeClone(m_octree);
+            }
+            else
+            {
+                std::cout << "OctomapClientInterface::UpdateOctomap failed" << std::endl;
+                return false;
+            }
+            return true;
         }
-        else
-        {
-            std::cout << "OctomapClientInterface::UpdateOctomap failed" << std::endl;
-            return false;
-        }
-        
-        return true;
+        return false;
     }
 
     bool OctomapClientInterface::Update(std::ostream &os, std::istream &i)
     {
         return UpdateOctomap();
     }
+
+    bool OctomapClientInterface::SetOcTree(std::ostream &os, std::istream &i)
+    {
+        i.get();
+            SAFE_DELETE(m_octree);
+        m_octree = static_cast<octomap::OcTree*> ( octomap::AbstractOcTree::read(i) );
+        m_collisionChecker->SetTreeClone(m_octree);
+        std::cout<<"m_octree size: "<<m_octree->size()<<std::endl;
+        return true;
+    }
+
+    bool OctomapClientInterface::GetOcTree(std::ostream &os, std::istream &i)
+    {
+        m_octree->write(os);
+        return true;
+    }
+
 }

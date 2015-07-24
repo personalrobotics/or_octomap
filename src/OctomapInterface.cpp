@@ -49,6 +49,9 @@ namespace or_octomap
         RegisterCommand("TogglePause", boost::bind(&OctomapInterface::TogglePause, this, _1, _2),
                         "Toggles the octomap to being paused/unpaused for collecting data");
 
+        RegisterCommand("GetOcTree", boost::bind(&OctomapInterface::GetOcTree, this, _1, _2),
+                        "Get the serialized OcTree");
+
         m_collisionChecker = NULL;
         boost::thread spinThread = boost::thread(boost::bind(&OctomapInterface::Spin, this));
         //boost::thread(boost::bind(&OctomapInterface::TestCollision, this));
@@ -379,6 +382,10 @@ namespace or_octomap
         return false;
     }
 
-
+    bool OctomapInterface::GetOcTree(std::ostream &os, std::istream &i)
+    {
+        m_octree->write(os);
+        return true;
+    }
 
 }

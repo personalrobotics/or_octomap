@@ -54,6 +54,8 @@ namespace or_octomap
             void Spin();
             void TestCollision();
 
+            bool GetOcTree(std::ostream &os, std::istream &i);
+
         protected:
             void CreateFakeBody();
             void DestroyFakeBody();

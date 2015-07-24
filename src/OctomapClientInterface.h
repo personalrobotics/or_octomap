@@ -21,7 +21,7 @@ namespace or_octomap
     class OctomapClientInterface : public OpenRAVE::SensorSystemBase
     {
         public:
-            OctomapClientInterface(ros::NodeHandle& nodeHandle, OpenRAVE::EnvironmentBasePtr env);
+            OctomapClientInterface(OpenRAVE::EnvironmentBasePtr env, bool ros);
             virtual ~OctomapClientInterface();
 
             virtual bool SendCommand(std::ostream &os, std::istream &is);
@@ -45,6 +45,9 @@ namespace or_octomap
             void Spin();
             bool UpdateOctomap();
 
+            bool SetOcTree(std::ostream &os, std::istream &i);
+            bool GetOcTree(std::ostream &os, std::istream &i);
+
         protected:
             void CreateFakeBody();
             void DestroyFakeBody();
@@ -55,9 +58,10 @@ namespace or_octomap
             boost::mutex m_cloudQueueMutex;
             std::vector<sensor_msgs::PointCloud2ConstPtr> m_cloudQueue;
             bool m_isPaused;
-            ros::ServiceClient m_octomapClient;
             octomap_msgs::GetOctomap m_octomapMsg;
             octomap::OcTree *m_octree;
+            bool m_ros;
+            
     };
 
 }

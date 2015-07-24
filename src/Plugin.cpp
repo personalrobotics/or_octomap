@@ -36,7 +36,7 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
 
         return OpenRAVE::InterfaceBasePtr(new OctomapInterface(nodeHandle,  penv));
     }
-    else if (type == OpenRAVE::PT_SensorSystem && interfacename == "or_octomap_client")
+    else if (type == OpenRAVE::PT_SensorSystem && interfacename == "or_octomap_client_ros")
     {
         if (!ros::isInitialized())
         {
@@ -50,7 +50,11 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
 
         ros::NodeHandle nodeHandle("~");
 
-        return OpenRAVE::InterfaceBasePtr(new OctomapClientInterface(nodeHandle,  penv));
+        return OpenRAVE::InterfaceBasePtr(new OctomapClientInterface(penv, true));
+    }
+    else if (type == OpenRAVE::PT_SensorSystem && interfacename == "or_octomap_client")
+    {
+        return OpenRAVE::InterfaceBasePtr(new OctomapClientInterface(penv, false));
     }
 
     return OpenRAVE::InterfaceBasePtr();
@@ -59,6 +63,7 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
 void GetPluginAttributesValidated(OpenRAVE::PLUGININFO& info)
 {
     info.interfacenames[OpenRAVE::PT_SensorSystem].push_back("or_octomap_server");
+    info.interfacenames[OpenRAVE::PT_SensorSystem].push_back("or_octomap_client_ros");
     info.interfacenames[OpenRAVE::PT_SensorSystem].push_back("or_octomap_client");
 }
 
