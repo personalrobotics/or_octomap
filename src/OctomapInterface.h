@@ -51,6 +51,8 @@ namespace or_octomap
             bool MaskObject(std::ostream &os, std::istream &i);
             bool UnmaskObject(std::ostream &os, std::istream &i);
 
+            bool UpdateAllMasks(std::ostream &os, std::istream &i);
+            bool UpdateMask(std::ostream &os, std::istream &i);
             void Spin();
             void TestCollision();
 

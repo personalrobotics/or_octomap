@@ -519,7 +519,7 @@ namespace or_octomap
         }
         else
         {
-            ROS_INFO("Masking...\n");
+//            ROS_INFO("Masking...\n");
         }
 
         if (GetTreeClone()->size() == 0)
@@ -592,7 +592,7 @@ namespace or_octomap
                             double dist_xy = sqrt(point_G[0] * point_G[0] + point_G[1] * point_G[1]);
                             double radius = (*git)->GetCylinderRadius();
                             double height = (*git)->GetCylinderHeight();
-                            if (dist_xy < size + radius && point_G[2] > -size && point_G[2] < height + size)
+                            if (dist_xy < size + radius && point_G[2] > -size - height*0.5 && point_G[2] < height*0.5 + size)
                             {
                                 nodes.push_back(GetTreeClone()->search(it.getKey()));
                             }
@@ -637,7 +637,7 @@ namespace or_octomap
         std::vector<octomap::OcTreeNode*> nodes;
         GetNodesColliding(name, nodes);
 
-        ROS_INFO("Got %lu colliding nodes\n", nodes.size());
+//        ROS_INFO("Got %lu colliding nodes\n", nodes.size());
         for(std::vector<octomap::OcTreeNode*>::iterator it = nodes.begin(); it != nodes.end(); it++)
         {
            if(*it)

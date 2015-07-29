@@ -49,6 +49,12 @@ namespace or_octomap
         RegisterCommand("TogglePause", boost::bind(&OctomapInterface::TogglePause, this, _1, _2),
                         "Toggles the octomap to being paused/unpaused for collecting data");
 
+        RegisterCommand("UpdateAllMasks", boost::bind(&OctomapInterface::UpdateAllMasks, this, _1, _2),
+                        "Apply the mask for all objects to filter them out of the octomap");
+        RegisterCommand("UpdateMask", boost::bind(&OctomapInterface::UpdateMask, this, _1, _2),
+                        "Update the mask of the object");
+
+
         RegisterCommand("GetOcTree", boost::bind(&OctomapInterface::GetOcTree, this, _1, _2),
                         "Get the serialized OcTree");
 
@@ -380,6 +386,57 @@ namespace or_octomap
         }
 
         return false;
+    }
+
+    bool OctomapInterface::UpdateAllMasks(std::ostream &os, std::istream &i)
+    {
+        // copy the vector of names
+        std::vector<std::string > maskedObjects;
+        {
+            boost::mutex::scoped_lock(m_maskedObjectsMutex);
+
+            maskedObjects.reserve(m_maskedObjects.size());
+            for (std::vector<std::string >::iterator o_it = m_maskedObjects.begin(); o_it != m_maskedObjects.end(); o_it++)
+            {
+                maskedObjects.push_back(*o_it);
+            }
+        }
+
+        for (std::vector<std::string >::iterator o_it = maskedObjects.begin(); o_it != maskedObjects.end(); o_it++)
+        {
+            m_collisionChecker->MaskObject(*o_it);
+        }
+        publishAll();
+
+        return true;
+    }
+
+    bool OctomapInterface::UpdateMask(std::ostream &os, std::istream &i)
+    {
+        std::string objectName;
+        i >> objectName;
+
+        // check if the name is in the vector of names
+        {
+            bool nameFound = false;
+            boost::mutex::scoped_lock(m_maskedObjectsMutex);
+            for (std::vector<std::string >::iterator o_it = m_maskedObjects.begin(); o_it != m_maskedObjects.end(); o_it++)
+            {
+                if (objectName == *o_it)
+                {
+                    nameFound = true;
+                }
+            }
+            if (!nameFound)
+            {
+                return false;
+            }
+        }
+
+        m_collisionChecker->MaskObject(objectName);
+        publishAll();
+
+        return true;
     }
 
     bool OctomapInterface::GetOcTree(std::ostream &os, std::istream &i)
