@@ -441,6 +441,7 @@ namespace or_octomap
 
     bool OctomapInterface::GetOcTree(std::ostream &os, std::istream &i)
     {
+        m_octree->prune();
         m_octree->write(os);
         return true;
     }
