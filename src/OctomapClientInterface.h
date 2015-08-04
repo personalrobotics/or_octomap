@@ -1,14 +1,12 @@
 ////
-// OctomapSensorSystem.h
+// OctomapClientInterface.h
 //
-//  Created on: Jan 24, 2014
-//      Author: mklingen
-//  Modified on: Jul 23, 2015
+//  Created on: Jul 20, 2015
 //      Author: dseredyn
 ////
 
-#ifndef OCTOMAPSENSORSYSTEM_H_
-#define OCTOMAPSENSORSYSTEM_H_
+#ifndef OCTOMAPCLIENTINTERFACE_H_
+#define OCTOMAPCLIENTINTERFACE_H_
 
 #include <openrave/openrave.h>
 #include <octomap_server/OctomapServer.h>
@@ -20,22 +18,17 @@
 namespace or_octomap
 {
     class OctomapCollisionChecker;
-    class OctomapInterface : public OpenRAVE::SensorSystemBase, public octomap_server::OctomapServer
+    class OctomapClientInterface : public OpenRAVE::SensorSystemBase
     {
         public:
-            OctomapInterface(ros::NodeHandle& nodeHandle, OpenRAVE::EnvironmentBasePtr env);
-            virtual ~OctomapInterface();
+            OctomapClientInterface(OpenRAVE::EnvironmentBasePtr env, bool ros);
+            virtual ~OctomapClientInterface();
 
             virtual bool SendCommand(std::ostream &os, std::istream &is);
             virtual void Reset();
 
-            virtual void insertScan(const tf::Point& sensorOrigin, const PCLPointCloud& ground, const PCLPointCloud& nonground);
-
             void SetEnabled(bool enabled);
             inline bool IsEnabled() { return m_isEnabled; }
-
-            octomap::OcTree* GetTree() { return m_octree; }
-
 
             // Not implemented virtual functions.
             virtual void   AddRegisteredBodies (const std::vector< OpenRAVE::KinBodyPtr > &vbodies) { }
@@ -45,17 +38,14 @@ namespace or_octomap
             virtual bool EnableBody(OpenRAVE::KinBodyPtr pbody, bool bEnable) { return false; }
             virtual bool SwitchBody (OpenRAVE::KinBodyPtr pbody1, OpenRAVE::KinBodyPtr pbody2) { return false; }
 
-            bool TogglePause(std::ostream &os, std::istream &i) { m_isPaused = !m_isPaused; return true;}
             bool Enable(std::ostream &os, std::istream &i) { SetEnabled(true); return true;}
             bool Disable(std::ostream &os, std::istream &i) { SetEnabled(false); return true; }
-            bool MaskObject(std::ostream &os, std::istream &i);
-            bool UnmaskObject(std::ostream &os, std::istream &i);
+            bool Update(std::ostream &os, std::istream &i);
 
-            bool UpdateAllMasks(std::ostream &os, std::istream &i);
-            bool UpdateMask(std::ostream &os, std::istream &i);
             void Spin();
-            void TestCollision();
+            bool UpdateOctomap();
 
+            bool SetOcTree(std::ostream &os, std::istream &i);
             bool GetOcTree(std::ostream &os, std::istream &i);
 
         protected:
@@ -68,10 +58,10 @@ namespace or_octomap
             boost::mutex m_cloudQueueMutex;
             std::vector<sensor_msgs::PointCloud2ConstPtr> m_cloudQueue;
             bool m_isPaused;
-            boost::mutex m_maskedObjectsMutex;
-            std::vector<std::string> m_maskedObjects;
-            OpenRAVE::KinBodyPtr m_sphere;
-            std::string m_pointCloudTopic;
+            octomap_msgs::GetOctomap m_octomapMsg;
+            octomap::OcTree *m_octree;
+            bool m_ros;
+            
     };
 
 }

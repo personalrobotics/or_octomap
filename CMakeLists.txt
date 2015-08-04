@@ -21,9 +21,15 @@ include_directories(
   ${OCTOMAP_INCLUDE_DIRS}
 )
 
+link_directories(
+    ${OpenRAVE_LIBRARY_DIRS}
+)
+
 set(SOURCES
  	src/OctomapInterface.cpp
  	src/OctomapInterface.h
+ 	src/OctomapClientInterface.cpp
+ 	src/OctomapClientInterface.h
  	src/OctomapCollisionChecker.cpp
  	src/OctomapCollisionChecker.h
  	src/FastAABBTriangleTest.h

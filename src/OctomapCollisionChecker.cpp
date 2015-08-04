@@ -3,6 +3,8 @@
 //
 //  Created on: Jan 24, 2014
 //      Author: mklingen
+//  Modified on: Jul 23, 2015
+//      Author: dseredyn
 ////
 
 #include "OctomapInterface.h"
@@ -517,7 +519,13 @@ namespace or_octomap
         }
         else
         {
-            ROS_INFO("Masking...\n");
+//            ROS_INFO("Masking...\n");
+        }
+
+        if (GetTreeClone()->size() == 0)
+        {
+            ROS_INFO("Empty tree...\n");
+            return;
         }
 
         OpenRAVE::AABB aabb = pbody->ComputeAABB();
@@ -548,8 +556,7 @@ namespace or_octomap
 
             if(!foundOccupied) continue;
 
-
-            const OpenRAVE::TriMesh& mesh = plink->GetCollisionData();
+            const std::vector<  OpenRAVE::KinBody::Link::GeometryPtr > geoms = plink->GetGeometries();
 
             OpenRAVE::Transform globalTransform = plink->GetTransform();
 
@@ -564,18 +571,61 @@ namespace or_octomap
 
                 if(it->getOccupancy() > GetTreeClone()->getOccupancyThres())
                 {
-                    for(size_t j = 0; j < mesh.indices.size() / 3; j++)
+                    for (std::vector<  OpenRAVE::KinBody::Link::GeometryPtr >::const_iterator git = geoms.begin(); git != geoms.end(); git++)
                     {
-
-                        OpenRAVE::Vector t1 = globalTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 0));
-                        OpenRAVE::Vector t2 = globalTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 1));
-                        OpenRAVE::Vector t3 = globalTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 2));
-
-                        int check = CollisionTestTriangleAABB(t1, t2, t3, point.x(), point.y(), point.z(), size, size, size);
-
-                        if(check)
+                        OpenRAVE::Transform localTransform = (*git)->GetTransform();
+                        if ((*git)->GetType() == OpenRAVE::GT_Sphere)
                         {
-                            nodes.push_back(GetTreeClone()->search(it.getKey()));
+                            double radius = (*git)->GetSphereRadius();
+                            OpenRAVE::Vector pos = localTransform * OpenRAVE::Vector();
+                            double dist_2 = (point.x()-pos[0]) * (point.x()-pos[0]) + (point.y()-pos[1]) * (point.y()-pos[1]) + (point.z()-pos[2]) * (point.z()-pos[2]);
+                            if (dist_2 <= (radius+size)*(radius+size))
+                            {
+                                nodes.push_back(GetTreeClone()->search(it.getKey()));
+                            }
+                        }
+                        else if ((*git)->GetType() == OpenRAVE::GT_Cylinder)
+                        {
+                            OpenRAVE::Transform T_W_G = globalTransform * localTransform;
+                            OpenRAVE::Transform T_G_W = T_W_G.inverse();
+                            OpenRAVE::Vector point_G = T_G_W * OpenRAVE::Vector(point.x(), point.y(), point.z());
+                            double dist_xy = sqrt(point_G[0] * point_G[0] + point_G[1] * point_G[1]);
+                            double radius = (*git)->GetCylinderRadius();
+                            double height = (*git)->GetCylinderHeight();
+                            if (dist_xy < size + radius && point_G[2] > -size - height*0.5 && point_G[2] < height*0.5 + size)
+                            {
+                                nodes.push_back(GetTreeClone()->search(it.getKey()));
+                            }
+                        }
+                        else if ((*git)->GetType() == OpenRAVE::GT_Box)
+                        {
+                            OpenRAVE::Transform T_W_G = globalTransform * localTransform;
+                            OpenRAVE::Transform T_G_W = T_W_G.inverse();
+                            OpenRAVE::Vector point_G = T_G_W * OpenRAVE::Vector(point.x(), point.y(), point.z());
+                            OpenRAVE::Vector box = (*git)->GetBoxExtents();
+                            if (point_G[0] > -box[0]-size && point_G[0] < box[0]+size &&
+                                point_G[1] > -box[1]-size && point_G[1] < box[1]+size &&
+                                point_G[2] > -box[2]-size && point_G[2] < box[2]+size)
+                            {
+                                nodes.push_back(GetTreeClone()->search(it.getKey()));
+                            }
+                        }
+                        else
+                        {
+                            const OpenRAVE::TriMesh& mesh = (*git)->GetCollisionMesh();
+                            for(size_t j = 0; j < mesh.indices.size() / 3; j++)
+                            {
+                                OpenRAVE::Vector t1 = globalTransform * localTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 0));
+                                OpenRAVE::Vector t2 = globalTransform * localTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 1));
+                                OpenRAVE::Vector t3 = globalTransform * localTransform * mesh.vertices.at(mesh.indices.at(j * 3 + 2));
+
+                                int check = CollisionTestTriangleAABB(t1, t2, t3, point.x(), point.y(), point.z(), size, size, size);
+
+                                if(check)
+                                {
+                                    nodes.push_back(GetTreeClone()->search(it.getKey()));
+                                }
+                            }
                         }
                     }
                 }
@@ -587,7 +637,7 @@ namespace or_octomap
         std::vector<octomap::OcTreeNode*> nodes;
         GetNodesColliding(name, nodes);
 
-        ROS_INFO("Got %lu colliding nodes\n", nodes.size());
+//        ROS_INFO("Got %lu colliding nodes\n", nodes.size());
         for(std::vector<octomap::OcTreeNode*>::iterator it = nodes.begin(); it != nodes.end(); it++)
         {
            if(*it)
