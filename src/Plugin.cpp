@@ -31,7 +31,7 @@ OpenRAVE::InterfaceBasePtr CreateInterfaceValidated(OpenRAVE::InterfaceType type
 
 
         std::map<std::string, std::string> remaps;
-        remaps["/cloud_in"] = "/head_kinect/depth_registered/points";
+        remaps["/cloud_in"] = "/head/kinect2/sd/points";
         //fakeNode = new ros::NodeHandle("remap_node", remaps);
 
         ros::NodeHandle nodeHandle("~", remaps);

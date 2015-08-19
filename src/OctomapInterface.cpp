@@ -29,7 +29,7 @@ namespace or_octomap
         //delete m_pointCloudSub;
         delete m_tfPointCloudSub;
 
-        m_pointCloudSub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh,  "/head_kinect/depth_registered/points", 1, ros::TransportHints(), &m_queue);
+        m_pointCloudSub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh,  "/head/kinect2/sd/points", 1, ros::TransportHints(), &m_queue);
         m_tfPointCloudSub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointCloudSub, m_tfListener, m_worldFrameId, 1, m_nh, ros::Duration(0.1));
         m_tfPointCloudSub->registerCallback(boost::bind(&OctomapInterface::InsertCloudWrapper, this, _1));
 
