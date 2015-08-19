@@ -3,8 +3,6 @@
 //
 //  Created on: Jan 24, 2014
 //      Author: mklingen
-//  Modified on: Jul 23, 2015
-//      Author: dseredyn
 ////
 
 #ifndef OCTOMAPSENSORSYSTEM_H_
@@ -29,8 +27,6 @@ namespace or_octomap
             virtual bool SendCommand(std::ostream &os, std::istream &is);
             virtual void Reset();
 
-            virtual void insertScan(const tf::Point& sensorOrigin, const PCLPointCloud& ground, const PCLPointCloud& nonground);
-
             void SetEnabled(bool enabled);
             inline bool IsEnabled() { return m_isEnabled; }
 
@@ -49,16 +45,17 @@ namespace or_octomap
             bool Enable(std::ostream &os, std::istream &i) { SetEnabled(true); return true;}
             bool Disable(std::ostream &os, std::istream &i) { SetEnabled(false); return true; }
             bool MaskObject(std::ostream &os, std::istream &i);
-            bool UnmaskObject(std::ostream &os, std::istream &i);
 
-            bool UpdateAllMasks(std::ostream &os, std::istream &i);
-            bool UpdateMask(std::ostream &os, std::istream &i);
             void Spin();
             void TestCollision();
 
-            bool GetOcTree(std::ostream &os, std::istream &i);
+
+
+
 
         protected:
+            void InsertScans();
+            void InsertCloudWrapper(const sensor_msgs::PointCloud2::ConstPtr& cloud);
             void CreateFakeBody();
             void DestroyFakeBody();
             bool m_isEnabled;
@@ -68,10 +65,7 @@ namespace or_octomap
             boost::mutex m_cloudQueueMutex;
             std::vector<sensor_msgs::PointCloud2ConstPtr> m_cloudQueue;
             bool m_isPaused;
-            boost::mutex m_maskedObjectsMutex;
-            std::vector<std::string> m_maskedObjects;
-            OpenRAVE::KinBodyPtr m_sphere;
-            std::string m_pointCloudTopic;
+
     };
 
 }
