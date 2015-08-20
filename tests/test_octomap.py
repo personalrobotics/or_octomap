@@ -33,7 +33,9 @@ table.SetTransform(table_pose)
 openravepy.RaveLoadPlugin("or_octomap")
 sensor_server = openravepy.RaveCreateSensorSystem(env,"or_octomap")
 sensor_server.SendCommand("Enable")
+raw_input('press enter to mask herb')
 sensor_server.SendCommand("Mask " + robot.GetName())
+raw_input('press enter to quit')
 #Create collision checker
 '''
 collision_checker = openravepy.RaveCreateCollisionChecker(env,"or_octomap_checker")

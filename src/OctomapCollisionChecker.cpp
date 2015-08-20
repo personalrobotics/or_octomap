@@ -48,6 +48,7 @@ namespace or_octomap
             return m_server->GetTree();
         }
 
+        ROS_ERROR("No tree exists");
         return NULL;
 
     }
@@ -508,6 +509,15 @@ namespace or_octomap
 
     void OctomapCollisionChecker::GetNodesColliding(const std::string& objectName, std::vector<octomap::OcTreeNode*>& nodes)
     {
+        ROS_INFO("Finding nodes colliding with %s\n", objectName.c_str());
+        octomap::OcTree* tree = GetTreeClone();
+        
+        if (!tree->getRoot())
+        {
+           ROS_WARN("Tree has no root.\n");
+           return;
+        }
+        
         OpenRAVE::KinBodyPtr pbody = GetEnv()->GetKinBody(objectName);
 
         if(!pbody.get())
@@ -521,7 +531,12 @@ namespace or_octomap
         }
 
         OpenRAVE::AABB aabb = pbody->ComputeAABB();
-        float halfResolution = GetTreeClone()->getResolution() * 1.5f;
+        if (!GetTreeClone())
+        {
+            ROS_ERROR("No tree!\n");
+            return;
+        }
+        float halfResolution = tree->getResolution() * 1.5f;
 
         for(size_t i = 0; i < pbody->GetLinks().size(); i++)
         {
@@ -533,12 +548,14 @@ namespace or_octomap
 
             octomap::point3d minPoint = octomap::point3d(aabb.pos.x - aabb.extents.x, aabb.pos.y - aabb.extents.y, aabb.pos.z - aabb.extents.z);
             octomap::point3d maxPoint = octomap::point3d(aabb.pos.x + aabb.extents.x, aabb.pos.y + aabb.extents.y, aabb.pos.z + aabb.extents.z);
-
-            octomap::OcTree::leaf_bbx_iterator it = GetTreeClone()->begin_leafs_bbx(minPoint, maxPoint);
+            ROS_INFO("Computing nodes for link %s\n", plink->GetName().c_str());
+            ROS_INFO("Bounding box is %f %f %f %f %f %f\n", minPoint.x(), minPoint.y(), minPoint.z(), maxPoint.x(), maxPoint.y(), maxPoint.z());
+            octomap::OcTree::leaf_bbx_iterator it = tree->begin_leafs_bbx(minPoint, maxPoint);
+            printf("Created iterator\n");
             bool foundOccupied = false;
-            while(it != GetTreeClone()->end_leafs_bbx())
+            while(it !=tree->end_leafs_bbx())
             {
-                if(it->getOccupancy() > GetTreeClone()->getOccupancyThres())
+                if(it->getOccupancy() > tree->getOccupancyThres())
                 {
                    foundOccupied = true;
                    break;
@@ -553,8 +570,8 @@ namespace or_octomap
 
             OpenRAVE::Transform globalTransform = plink->GetTransform();
 
-            octomap::OcTree::leaf_bbx_iterator leafIterBegin = GetTreeClone()->begin_leafs_bbx(octomap::point3d(aabb.pos.x - aabb.extents.x, aabb.pos.y - aabb.extents.y, aabb.pos.z - aabb.extents.z),  octomap::point3d(aabb.pos.x + aabb.extents.x, aabb.pos.y + aabb.extents.y, aabb.pos.z + aabb.extents.z));
-            octomap::OcTree::leaf_bbx_iterator endIter = GetTreeClone()->end_leafs_bbx();
+            octomap::OcTree::leaf_bbx_iterator leafIterBegin = tree->begin_leafs_bbx(octomap::point3d(aabb.pos.x - aabb.extents.x, aabb.pos.y - aabb.extents.y, aabb.pos.z - aabb.extents.z),  octomap::point3d(aabb.pos.x + aabb.extents.x, aabb.pos.y + aabb.extents.y, aabb.pos.z + aabb.extents.z));
+            octomap::OcTree::leaf_bbx_iterator endIter = tree->end_leafs_bbx();
 
             for(octomap::OcTree::leaf_bbx_iterator it = leafIterBegin; it!= endIter; it++)
             {
@@ -562,7 +579,7 @@ namespace or_octomap
                 const octomap::point3d& point = it.getCoordinate();
                 float size = it.getSize() * 1.5f;
 
-                if(it->getOccupancy() > GetTreeClone()->getOccupancyThres())
+                if(it->getOccupancy() > tree->getOccupancyThres())
                 {
                     for(size_t j = 0; j < mesh.indices.size() / 3; j++)
                     {
@@ -575,7 +592,7 @@ namespace or_octomap
 
                         if(check)
                         {
-                            nodes.push_back(GetTreeClone()->search(it.getKey()));
+                            nodes.push_back(tree->search(it.getKey()));
                         }
                     }
                 }
